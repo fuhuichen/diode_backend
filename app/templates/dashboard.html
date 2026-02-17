@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Diode Backend{% endblock %}
+{% block content %}
+<h1 class="text-3xl font-bold mb-8">Dashboard</h1>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-sm text-gray-500 uppercase">Total Nodes</div>
+        <div class="text-3xl font-bold text-indigo-700 mt-2">{{ total_nodes }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-sm text-gray-500 uppercase">Online Nodes</div>
+        <div class="text-3xl font-bold text-green-600 mt-2">{{ online_nodes }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-sm text-gray-500 uppercase">Total Apps</div>
+        <div class="text-3xl font-bold text-blue-600 mt-2">{{ total_apps }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-sm text-gray-500 uppercase">Active Connections</div>
+        <div class="text-3xl font-bold text-orange-600 mt-2">{{ active_connections }}</div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Connections - Diode Backend{% endblock %}
+{% block content %}
+<h1 class="text-3xl font-bold mb-6">Connections</h1>
+
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Session ID</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">App</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Node</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Keepalive</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Connected</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Disconnected</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            {% for conn in connections %}
+            <tr>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <code class="text-xs">{{ conn.session_id[:24] }}...</code>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    <a href="/apps/{{ conn.app_id }}" class="text-indigo-600 hover:text-indigo-800">{{ conn.app_id | string | truncate(8, True, '') }}</a>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {{ conn.node_id | string | truncate(8, True, '') }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    {% if conn.status == 'active' %}
+                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">active</span>
+                    {% else %}
+                    <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">closed</span>
+                    {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {{ conn.last_keepalive.strftime('%H:%M:%S') }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {{ conn.connected_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {{ conn.disconnected_at.strftime('%Y-%m-%d %H:%M:%S') if conn.disconnected_at else '-' }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

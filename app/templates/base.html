@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Diode Backend{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-indigo-700 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <a href="/dashboard" class="text-xl font-bold">Diode Backend</a>
+            <div class="flex items-center space-x-6">
+                <a href="/dashboard" class="hover:text-indigo-200">Dashboard</a>
+                <a href="/nodes" class="hover:text-indigo-200">Nodes</a>
+                <a href="/apps" class="hover:text-indigo-200">Apps</a>
+                <a href="/connections" class="hover:text-indigo-200">Connections</a>
+                <a href="/logout" class="hover:text-indigo-200">Logout</a>
+            </div>
+        </div>
+    </nav>
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

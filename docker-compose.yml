@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: diode
+      POSTGRES_PASSWORD: diode_secret
+      POSTGRES_DB: diode_backend
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://diode:diode_secret@db:5432/diode_backend
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: changeme
+      JWT_SECRET_KEY: change-this-to-a-random-secret-key
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
