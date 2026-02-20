@@ -100,25 +100,57 @@ async def web_dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     except Exception:
         return RedirectResponse(url="/login")
 
-    nodes_result = await db.execute(select(Node))
-    nodes = nodes_result.scalars().all()
+    nodes_result = await db.execute(select(Node).order_by(Node.created_at.desc()))
+    nodes = list(nodes_result.scalars().all())
     total_nodes = len(nodes)
     online_nodes = sum(1 for n in nodes if n.status == "online")
+    unhealthy_nodes = sum(1 for n in nodes if n.status == "unhealthy")
 
-    apps_result = await db.execute(select(func.count()).select_from(Application))
-    total_apps = apps_result.scalar_one()
+    apps_result = await db.execute(
+        select(Application).options(selectinload(Application.regions)).order_by(Application.created_at.desc())
+    )
+    apps = list(apps_result.scalars().all())
+    total_apps = len(apps)
 
     active_conns = await db.execute(
         select(func.count()).select_from(Connection).where(Connection.status == "active")
     )
     total_active = active_conns.scalar_one()
 
+    total_conns = await db.execute(select(func.count()).select_from(Connection))
+    total_connections = total_conns.scalar_one()
+
+    total_usage = sum(a.usage_count for a in apps)
+
+    # Recent connections (last 10)
+    recent_conns_result = await db.execute(
+        select(Connection).order_by(Connection.connected_at.desc()).limit(10)
+    )
+    recent_connections = list(recent_conns_result.scalars().all())
+
+    # Region stats
+    region_stats = {}
+    for n in nodes:
+        r = n.region
+        if r not in region_stats:
+            region_stats[r] = {"total": 0, "online": 0}
+        region_stats[r]["total"] += 1
+        if n.status == "online":
+            region_stats[r]["online"] += 1
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "total_nodes": total_nodes,
         "online_nodes": online_nodes,
+        "unhealthy_nodes": unhealthy_nodes,
         "total_apps": total_apps,
         "active_connections": total_active,
+        "total_connections": total_connections,
+        "total_usage": total_usage,
+        "nodes": nodes[:5],
+        "apps": apps[:5],
+        "recent_connections": recent_connections,
+        "region_stats": region_stats,
     })
 
 

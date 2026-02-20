@@ -5,22 +5,50 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Diode Backend{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                colors: {
+                    brand: { 50:'#eef2ff', 100:'#e0e7ff', 200:'#c7d2fe', 300:'#a5b4fc', 400:'#818cf8', 500:'#6366f1', 600:'#4f46e5', 700:'#4338ca', 800:'#3730a3', 900:'#312e81' }
+                }
+            }
+        }
+    }
+    </script>
+    <style>
+        .nav-link { position: relative; padding: 0.5rem 0; }
+        .nav-link::after { content:''; position:absolute; bottom:0; left:0; width:0; height:2px; background:#c7d2fe; transition:width 0.2s; }
+        .nav-link:hover::after, .nav-link.active::after { width:100%; }
+        .stat-card { transition: transform 0.15s, box-shadow 0.15s; }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <nav class="bg-indigo-700 text-white shadow-lg">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-            <a href="/dashboard" class="text-xl font-bold">Diode Backend</a>
-            <div class="flex items-center space-x-6">
-                <a href="/dashboard" class="hover:text-indigo-200">Dashboard</a>
-                <a href="/nodes" class="hover:text-indigo-200">Nodes</a>
-                <a href="/apps" class="hover:text-indigo-200">Apps</a>
-                <a href="/connections" class="hover:text-indigo-200">Connections</a>
-                <a href="/logout" class="hover:text-indigo-200">Logout</a>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-gradient-to-r from-brand-700 via-brand-600 to-indigo-600 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-0 flex items-center justify-between">
+            <a href="/dashboard" class="flex items-center space-x-3 py-4">
+                <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </div>
+                <span class="text-lg font-bold tracking-tight">Diode Backend</span>
+            </a>
+            <div class="flex items-center space-x-1">
+                {% set current_path = request.url.path %}
+                <a href="/dashboard" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if current_path == '/dashboard' %}active text-white{% else %}text-indigo-100{% endif %}">Dashboard</a>
+                <a href="/nodes" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if current_path == '/nodes' %}active text-white{% else %}text-indigo-100{% endif %}">Nodes</a>
+                <a href="/apps" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if '/apps' in current_path %}active text-white{% else %}text-indigo-100{% endif %}">Apps</a>
+                <a href="/connections" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if current_path == '/connections' %}active text-white{% else %}text-indigo-100{% endif %}">Connections</a>
+                <div class="w-px h-6 bg-indigo-400/50 mx-2"></div>
+                <a href="/logout" class="px-3 py-1.5 text-sm text-indigo-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Logout</a>
             </div>
         </div>
     </nav>
-    <main class="max-w-7xl mx-auto px-4 py-8">
+    <main class="max-w-7xl mx-auto px-6 py-8">
         {% block content %}{% endblock %}
     </main>
+    <footer class="max-w-7xl mx-auto px-6 py-6 text-center text-xs text-gray-400">
+        Diode Backend v1.0
+    </footer>
 </body>
 </html>
