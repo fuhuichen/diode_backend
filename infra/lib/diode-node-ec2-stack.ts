@@ -28,6 +28,8 @@ export class DiodeNodeEc2Stack extends cdk.Stack {
     });
 
     sg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(22), "SSH");
+    sg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(3300), "Diode SOCKS TCP");
+    sg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.udp(3300), "Diode SOCKS UDP");
     sg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(41046), "Diode TCP");
     sg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.udp(41046), "Diode UDP");
 

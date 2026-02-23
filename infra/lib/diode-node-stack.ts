@@ -54,6 +54,20 @@ export class DiodeNodeStack extends cdk.Stack {
             },
             {
               protocol: "tcp",
+              fromPort: 3300,
+              toPort: 3300,
+              accessFrom: "0.0.0.0/0",
+              accessType: "public",
+            },
+            {
+              protocol: "udp",
+              fromPort: 3300,
+              toPort: 3300,
+              accessFrom: "0.0.0.0/0",
+              accessType: "public",
+            },
+            {
+              protocol: "tcp",
               fromPort: 41046,
               toPort: 41046,
               accessFrom: "0.0.0.0/0",
