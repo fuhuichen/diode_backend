@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Deploy Diode nodes to AWS Lightsail via CDK
+# Deploy Diode nodes to AWS Lightsail or EC2 via CDK
 # Usage: ./deploy-node.sh [region] [count]
 #
 # Environment variables:
@@ -10,7 +10,9 @@ set -euo pipefail
 #   BACKEND_URL    - Backend API URL (default: https://api.diode.dev)
 #   DIODE_VERSION  - Diode client version (default: v1.17.2)
 #   BUNDLE_ID      - Lightsail bundle (default: nano_3_0)
-#   KEY_PAIR_NAME  - Optional Lightsail key pair for SSH access
+#   KEY_PAIR_NAME  - Optional key pair for SSH access
+#   PROVIDER       - "lightsail" (default) or "ec2"
+#   INSTANCE_TYPE  - EC2 instance type (default: t3a.nano, ignored for lightsail)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INFRA_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -23,13 +25,27 @@ ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
 DIODE_VERSION="${DIODE_VERSION:-v1.17.2}"
 BUNDLE_ID="${BUNDLE_ID:-nano_3_0}"
 KEY_PAIR_NAME="${KEY_PAIR_NAME:-}"
+PROVIDER="${PROVIDER:-lightsail}"
+INSTANCE_TYPE="${INSTANCE_TYPE:-t3a.nano}"
+
+# Derive stack name based on provider
+if [ "$PROVIDER" = "ec2" ]; then
+  STACK_NAME="DiodeNodesEc2-${REGION}"
+else
+  STACK_NAME="DiodeNodes-${REGION}"
+fi
 
 echo "=== Diode Node Deployment ==="
-echo "Region:  ${REGION}"
-echo "Count:   ${COUNT}"
-echo "Backend: ${BACKEND_URL}"
-echo "Version: ${DIODE_VERSION}"
-echo "Bundle:  ${BUNDLE_ID}"
+echo "Provider: ${PROVIDER}"
+echo "Region:   ${REGION}"
+echo "Count:    ${COUNT}"
+echo "Backend:  ${BACKEND_URL}"
+echo "Version:  ${DIODE_VERSION}"
+if [ "$PROVIDER" = "ec2" ]; then
+  echo "Instance: ${INSTANCE_TYPE}"
+else
+  echo "Bundle:   ${BUNDLE_ID}"
+fi
 echo ""
 
 # --- 1. Authenticate with backend ---
@@ -70,10 +86,10 @@ done
 
 # --- 3. CDK Deploy ---
 echo ""
-echo "Deploying CDK stack DiodeNodes-${REGION}..."
+echo "Deploying CDK stack ${STACK_NAME}..."
 cd "$INFRA_DIR"
 
-npx cdk deploy "DiodeNodes-${REGION}" \
+npx cdk deploy "$STACK_NAME" \
   --require-approval never \
   -c region="${REGION}" \
   -c instanceCount="${COUNT}" \
@@ -81,7 +97,9 @@ npx cdk deploy "DiodeNodes-${REGION}" \
   -c bundleId="${BUNDLE_ID}" \
   -c diodeVersion="${DIODE_VERSION}" \
   -c backendUrl="${BACKEND_URL}" \
-  -c keyPairName="${KEY_PAIR_NAME}"
+  -c keyPairName="${KEY_PAIR_NAME}" \
+  -c provider="${PROVIDER}" \
+  -c instanceType="${INSTANCE_TYPE}"
 
 echo ""
 echo "CDK deployment complete."

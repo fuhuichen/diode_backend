@@ -1,8 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import * as lightsail from "aws-cdk-lib/aws-lightsail";
 import { Construct } from "constructs";
-import * as fs from "fs";
-import * as path from "path";
+import { generateUserData } from "./user-data-helper";
 
 export interface DiodeNodeStackProps extends cdk.StackProps {
   region: string;
@@ -19,28 +18,17 @@ export class DiodeNodeStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: DiodeNodeStackProps) {
     super(scope, id, props);
 
-    // Read user-data template
-    const userDataTemplate = fs.readFileSync(
-      path.join(__dirname, "user-data.sh"),
-      "utf-8"
-    );
-
-    // Read agent.py content to embed in user-data
-    const agentPyPath = path.join(__dirname, "..", "..", "agent", "agent.py");
-    const agentPyContent = fs.readFileSync(agentPyPath, "utf-8");
-
     for (let i = 0; i < props.instanceCount; i++) {
       const nodeName = `diode-node-${props.region}-${i}`;
       const nodeToken = props.nodeTokens[i];
 
-      // Replace placeholders in user-data
-      const userData = userDataTemplate
-        .replace(/\{\{NODE_TOKEN\}\}/g, nodeToken)
-        .replace(/\{\{BACKEND_URL\}\}/g, props.backendUrl)
-        .replace(/\{\{REGION\}\}/g, props.region)
-        .replace(/\{\{NODE_NAME\}\}/g, nodeName)
-        .replace(/\{\{DIODE_VERSION\}\}/g, props.diodeVersion)
-        .replace(/\{\{AGENT_PY_CONTENT\}\}/g, agentPyContent);
+      const userData = generateUserData({
+        nodeToken,
+        backendUrl: props.backendUrl,
+        region: props.region,
+        nodeName,
+        diodeVersion: props.diodeVersion,
+      });
 
       const instance = new lightsail.CfnInstance(this, `DiodeNode${i}`, {
         instanceName: nodeName,
