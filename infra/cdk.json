@@ -1,0 +1,16 @@
+{
+  "app": "npx ts-node --prefer-ts-exts bin/infra.ts",
+  "watch": {
+    "include": ["**"],
+    "exclude": ["node_modules", "dist", "cdk.out"]
+  },
+  "context": {
+    "region": "ap-southeast-1",
+    "instanceCount": "1",
+    "bundleId": "nano_3_0",
+    "blueprintId": "amazon_linux_2023",
+    "diodeVersion": "v1.17.2",
+    "backendUrl": "http://13.213.186.48/diode",
+    "keyPairName": ""
+  }
+}
