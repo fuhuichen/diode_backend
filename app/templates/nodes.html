@@ -82,7 +82,8 @@
 document.getElementById('createForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const token = document.cookie.split('; ').find(c => c.startsWith('admin_token='))?.split('=')[1];
-    const res = await fetch('/api/admin/nodes', {
+    const rootPath = '{{ request.scope.get("root_path", "") }}';
+    const res = await fetch(rootPath + '/api/admin/nodes', {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
         body: JSON.stringify({name: document.getElementById('nodeName').value, region: document.getElementById('nodeRegion').value})

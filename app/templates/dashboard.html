@@ -114,7 +114,7 @@
     <div class="bg-white rounded-xl border border-gray-200 p-6">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-sm font-semibold text-gray-900">Recent Nodes</h2>
-            <a href="/nodes" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View all &rarr;</a>
+            <a href="{{ request.scope.get('root_path', '') }}/nodes" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View all &rarr;</a>
         </div>
         {% if nodes %}
         <div class="space-y-3">
@@ -140,12 +140,12 @@
     <div class="bg-white rounded-xl border border-gray-200 p-6">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-sm font-semibold text-gray-900">Applications</h2>
-            <a href="/apps" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View all &rarr;</a>
+            <a href="{{ request.scope.get('root_path', '') }}/apps" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View all &rarr;</a>
         </div>
         {% if apps %}
         <div class="space-y-3">
             {% for app in apps %}
-            <a href="/apps/{{ app.id }}" class="flex items-center justify-between py-2 {% if not loop.last %}border-b border-gray-50{% endif %} hover:bg-gray-50 -mx-2 px-2 rounded-lg transition-colors">
+            <a href="{{ request.scope.get('root_path', '') }}/apps/{{ app.id }}" class="flex items-center justify-between py-2 {% if not loop.last %}border-b border-gray-50{% endif %} hover:bg-gray-50 -mx-2 px-2 rounded-lg transition-colors">
                 <div>
                     <p class="text-sm font-medium text-gray-900">{{ app.name }}</p>
                     <p class="text-xs text-gray-400">{{ app.usage_count }} / {{ app.usage_limit }} usage</p>
@@ -170,7 +170,7 @@
 <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
     <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
         <h2 class="text-sm font-semibold text-gray-900">Recent Connections</h2>
-        <a href="/connections" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View all &rarr;</a>
+        <a href="{{ request.scope.get('root_path', '') }}/connections" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View all &rarr;</a>
     </div>
     {% if recent_connections %}
     <table class="min-w-full">

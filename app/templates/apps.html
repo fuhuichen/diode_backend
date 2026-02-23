@@ -26,7 +26,7 @@
             {% for d in apps_data %}
             <tr>
                 <td class="px-6 py-4 whitespace-nowrap font-medium">
-                    <a href="/apps/{{ d.app.id }}" class="text-indigo-600 hover:text-indigo-800">{{ d.app.name }}</a>
+                    <a href="{{ request.scope.get('root_path', '') }}/apps/{{ d.app.id }}" class="text-indigo-600 hover:text-indigo-800">{{ d.app.name }}</a>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <code class="bg-gray-100 px-2 py-1 rounded text-xs">{{ d.app.api_key[:20] }}...</code>
@@ -50,7 +50,7 @@
                     {% endif %}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <a href="/apps/{{ d.app.id }}" class="text-indigo-600 hover:text-indigo-800 text-sm">Detail</a>
+                    <a href="{{ request.scope.get('root_path', '') }}/apps/{{ d.app.id }}" class="text-indigo-600 hover:text-indigo-800 text-sm">Detail</a>
                 </td>
             </tr>
             {% endfor %}
@@ -104,7 +104,8 @@ document.getElementById('createForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const token = document.cookie.split('; ').find(c => c.startsWith('admin_token='))?.split('=')[1];
     const regions = document.getElementById('regions').value.split(',').map(r => r.trim()).filter(r => r);
-    const res = await fetch('/api/admin/apps', {
+    const rootPath = '{{ request.scope.get("root_path", "") }}';
+    const res = await fetch(rootPath + '/api/admin/apps', {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
         body: JSON.stringify({

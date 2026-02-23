@@ -27,20 +27,21 @@
 <body class="bg-gray-50 min-h-screen">
     <nav class="bg-gradient-to-r from-brand-700 via-brand-600 to-indigo-600 text-white shadow-lg sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-6 py-0 flex items-center justify-between">
-            <a href="/dashboard" class="flex items-center space-x-3 py-4">
+            <a href="{{ request.scope.get('root_path', '') }}/dashboard" class="flex items-center space-x-3 py-4">
                 <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                 </div>
                 <span class="text-lg font-bold tracking-tight">Diode Backend</span>
             </a>
             <div class="flex items-center space-x-1">
+                {% set rp = request.scope.get('root_path', '') %}
                 {% set current_path = request.url.path %}
-                <a href="/dashboard" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if current_path == '/dashboard' %}active text-white{% else %}text-indigo-100{% endif %}">Dashboard</a>
-                <a href="/nodes" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if current_path == '/nodes' %}active text-white{% else %}text-indigo-100{% endif %}">Nodes</a>
-                <a href="/apps" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if '/apps' in current_path %}active text-white{% else %}text-indigo-100{% endif %}">Apps</a>
-                <a href="/connections" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if current_path == '/connections' %}active text-white{% else %}text-indigo-100{% endif %}">Connections</a>
+                <a href="{{ rp }}/dashboard" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if current_path.endswith('/dashboard') %}active text-white{% else %}text-indigo-100{% endif %}">Dashboard</a>
+                <a href="{{ rp }}/nodes" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if current_path.endswith('/nodes') %}active text-white{% else %}text-indigo-100{% endif %}">Nodes</a>
+                <a href="{{ rp }}/apps" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if '/apps' in current_path %}active text-white{% else %}text-indigo-100{% endif %}">Apps</a>
+                <a href="{{ rp }}/connections" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if current_path.endswith('/connections') %}active text-white{% else %}text-indigo-100{% endif %}">Connections</a>
                 <div class="w-px h-6 bg-indigo-400/50 mx-2"></div>
-                <a href="/logout" class="px-3 py-1.5 text-sm text-indigo-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Logout</a>
+                <a href="{{ rp }}/logout" class="px-3 py-1.5 text-sm text-indigo-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Logout</a>
             </div>
         </div>
     </nav>

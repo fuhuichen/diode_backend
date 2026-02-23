@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -38,7 +39,12 @@ async def lifespan(app: FastAPI):
         pass
 
 
-app = FastAPI(title="Diode Backend", version="1.0.0", lifespan=lifespan)
+app = FastAPI(
+    title="Diode Backend",
+    version="1.0.0",
+    lifespan=lifespan,
+    root_path=os.getenv("ROOT_PATH", ""),
+)
 
 # Routers
 app.include_router(agent_router)
@@ -56,16 +62,21 @@ def get_admin_token(request: Request) -> str | None:
     return request.cookies.get("admin_token")
 
 
+def _prefix(request: Request, path: str) -> str:
+    """Prepend root_path to an internal path for redirects."""
+    return request.scope.get("root_path", "") + path
+
+
 @app.get("/", response_class=HTMLResponse)
 async def web_root(request: Request):
     token = get_admin_token(request)
     if not token:
-        return RedirectResponse(url="/login")
+        return RedirectResponse(url=_prefix(request, "/login"))
     try:
         decode_jwt_token(token)
     except Exception:
-        return RedirectResponse(url="/login")
-    return RedirectResponse(url="/dashboard")
+        return RedirectResponse(url=_prefix(request, "/login"))
+    return RedirectResponse(url=_prefix(request, "/dashboard"))
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -78,15 +89,15 @@ async def web_login_post(request: Request, username: str = Form(...), password: 
     if username != settings.ADMIN_USERNAME or password != settings.ADMIN_PASSWORD:
         return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials"})
     token = create_jwt_token({"sub": username, "role": "admin"})
-    response = RedirectResponse(url="/dashboard", status_code=303)
-    response.set_cookie("admin_token", token, httponly=True, max_age=86400)
+    response = RedirectResponse(url=_prefix(request, "/dashboard"), status_code=303)
+    response.set_cookie("admin_token", token, httponly=True, max_age=86400, path=request.scope.get("root_path", "") or "/")
     return response
 
 
 @app.get("/logout")
-async def web_logout():
-    response = RedirectResponse(url="/login")
-    response.delete_cookie("admin_token")
+async def web_logout(request: Request):
+    response = RedirectResponse(url=_prefix(request, "/login"))
+    response.delete_cookie("admin_token", path=request.scope.get("root_path", "") or "/")
     return response
 
 
@@ -94,11 +105,11 @@ async def web_logout():
 async def web_dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     token = get_admin_token(request)
     if not token:
-        return RedirectResponse(url="/login")
+        return RedirectResponse(url=_prefix(request, "/login"))
     try:
         decode_jwt_token(token)
     except Exception:
-        return RedirectResponse(url="/login")
+        return RedirectResponse(url=_prefix(request, "/login"))
 
     nodes_result = await db.execute(select(Node).order_by(Node.created_at.desc()))
     nodes = list(nodes_result.scalars().all())
@@ -158,11 +169,11 @@ async def web_dashboard(request: Request, db: AsyncSession = Depends(get_db)):
 async def web_nodes(request: Request, db: AsyncSession = Depends(get_db)):
     token = get_admin_token(request)
     if not token:
-        return RedirectResponse(url="/login")
+        return RedirectResponse(url=_prefix(request, "/login"))
     try:
         decode_jwt_token(token)
     except Exception:
-        return RedirectResponse(url="/login")
+        return RedirectResponse(url=_prefix(request, "/login"))
 
     result = await db.execute(select(Node).order_by(Node.created_at.desc()))
     nodes = result.scalars().all()
@@ -173,11 +184,11 @@ async def web_nodes(request: Request, db: AsyncSession = Depends(get_db)):
 async def web_apps(request: Request, db: AsyncSession = Depends(get_db)):
     token = get_admin_token(request)
     if not token:
-        return RedirectResponse(url="/login")
+        return RedirectResponse(url=_prefix(request, "/login"))
     try:
         decode_jwt_token(token)
     except Exception:
-        return RedirectResponse(url="/login")
+        return RedirectResponse(url=_prefix(request, "/login"))
 
     result = await db.execute(
         select(Application).options(selectinload(Application.regions)).order_by(Application.created_at.desc())
@@ -201,11 +212,11 @@ async def web_apps(request: Request, db: AsyncSession = Depends(get_db)):
 async def web_app_detail(request: Request, app_id: str, db: AsyncSession = Depends(get_db)):
     token = get_admin_token(request)
     if not token:
-        return RedirectResponse(url="/login")
+        return RedirectResponse(url=_prefix(request, "/login"))
     try:
         decode_jwt_token(token)
     except Exception:
-        return RedirectResponse(url="/login")
+        return RedirectResponse(url=_prefix(request, "/login"))
 
     import uuid as uuid_mod
     result = await db.execute(
@@ -235,11 +246,11 @@ async def web_app_detail(request: Request, app_id: str, db: AsyncSession = Depen
 async def web_connections(request: Request, db: AsyncSession = Depends(get_db)):
     token = get_admin_token(request)
     if not token:
-        return RedirectResponse(url="/login")
+        return RedirectResponse(url=_prefix(request, "/login"))
     try:
         decode_jwt_token(token)
     except Exception:
-        return RedirectResponse(url="/login")
+        return RedirectResponse(url=_prefix(request, "/login"))
 
     result = await db.execute(
         select(Connection).order_by(Connection.connected_at.desc()).limit(200)

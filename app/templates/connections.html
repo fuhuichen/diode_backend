@@ -23,7 +23,7 @@
                     <code class="text-xs">{{ conn.session_id[:24] }}...</code>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">
-                    <a href="/apps/{{ conn.app_id }}" class="text-indigo-600 hover:text-indigo-800">{{ conn.app_id | string | truncate(8, True, '') }}</a>
+                    <a href="{{ request.scope.get('root_path', '') }}/apps/{{ conn.app_id }}" class="text-indigo-600 hover:text-indigo-800">{{ conn.app_id | string | truncate(8, True, '') }}</a>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                     {{ conn.node_id | string | truncate(8, True, '') }}

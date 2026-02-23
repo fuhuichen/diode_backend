@@ -2,7 +2,7 @@
 {% block title %}{{ app.name }} - Diode Backend{% endblock %}
 {% block content %}
 <div class="mb-6">
-    <a href="/apps" class="text-indigo-600 hover:text-indigo-800">&larr; Back to Apps</a>
+    <a href="{{ request.scope.get('root_path', '') }}/apps" class="text-indigo-600 hover:text-indigo-800">&larr; Back to Apps</a>
 </div>
 
 <div class="bg-white rounded-lg shadow p-6 mb-6">
