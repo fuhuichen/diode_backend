@@ -187,6 +187,7 @@
         <a href="{{ request.scope.get('root_path', '') }}/connections" class="text-xs text-brand-600 hover:text-brand-700 font-medium">View all &rarr;</a>
     </div>
     {% if recent_connections %}
+    <div class="overflow-x-auto">
     <table class="min-w-full">
         <thead>
             <tr class="bg-gray-50/50">
@@ -221,6 +222,7 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
     {% else %}
     <div class="px-6 py-12 text-center">
         <svg class="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
