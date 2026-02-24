@@ -18,8 +18,9 @@ import argparse
 import asyncio
 import logging
 import os
+import re
 import signal
-import socket
+import subprocess
 import sys
 
 import httpx
@@ -30,8 +31,27 @@ logger = logging.getLogger("diode-agent")
 HEARTBEAT_INTERVAL = 30  # seconds
 
 
+def get_diode_client_address() -> str | None:
+    """Parse the diode client address from `diode config`."""
+    try:
+        result = subprocess.run(
+            ["diode", "config"],
+            capture_output=True, text=True, timeout=30,
+        )
+        output = result.stdout + result.stderr
+        match = re.search(r"Client address\s*:\s*(0x[0-9a-fA-F]+)", output)
+        if match:
+            return match.group(1)
+    except Exception as e:
+        logger.warning(f"Failed to get diode client address: {e}")
+    return None
+
+
 def get_client_address(port: int = 41046) -> str:
-    """Attempt to detect external IP address."""
+    """Return diode client address, falling back to external IP."""
+    diode_addr = get_diode_client_address()
+    if diode_addr:
+        return diode_addr
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
