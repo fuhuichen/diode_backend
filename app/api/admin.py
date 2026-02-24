@@ -15,6 +15,7 @@ from app.config import settings
 from app.database import get_db
 from app.models.connection import Connection
 from app.models.node import Node
+from app.models.tenant import Tenant
 from app.schemas.application import (
     AppCreateRequest,
     AppCreateResponse,
@@ -22,6 +23,7 @@ from app.schemas.application import (
     AppUpdateRequest,
 )
 from app.schemas.node import NodeCreateRequest, NodeCreateResponse, NodeResponse
+from app.schemas.tenant import TenantCreateRequest, TenantResponse, TenantUpdateRequest
 from app.services.app_service import (
     create_app,
     delete_app,
@@ -29,6 +31,13 @@ from app.services.app_service import (
     get_all_apps,
     get_app_by_id,
     update_app,
+)
+from app.services.tenant_service import (
+    create_tenant,
+    delete_tenant,
+    get_all_tenants,
+    get_tenant_by_id,
+    update_tenant,
 )
 from app.services.node_service import get_all_nodes
 
@@ -75,12 +84,83 @@ async def dashboard(db: AsyncSession = Depends(get_db)):
     )
     total_active = active_conns.scalar_one()
 
+    tenants_data = await get_all_tenants(db)
+    total_tenants = len(tenants_data)
+
     return {
         "total_nodes": total_nodes,
         "online_nodes": online_nodes,
         "total_apps": total_apps,
         "active_connections": total_active,
+        "total_tenants": total_tenants,
     }
+
+
+# --- Tenant Management ---
+
+@router.post("/tenants", response_model=TenantResponse, status_code=201, dependencies=[Depends(get_current_admin)])
+async def create_tenant_endpoint(req: TenantCreateRequest, db: AsyncSession = Depends(get_db)):
+    tenant = await create_tenant(db, req.name, req.password)
+    return TenantResponse(
+        id=tenant.id,
+        name=tenant.name,
+        is_active=tenant.is_active,
+        app_count=0,
+        created_at=tenant.created_at,
+    )
+
+
+@router.get("/tenants", response_model=list[TenantResponse], dependencies=[Depends(get_current_admin)])
+async def list_tenants(db: AsyncSession = Depends(get_db)):
+    tenants_data = await get_all_tenants(db)
+    return [
+        TenantResponse(
+            id=d["tenant"].id,
+            name=d["tenant"].name,
+            is_active=d["tenant"].is_active,
+            app_count=d["app_count"],
+            created_at=d["tenant"].created_at,
+        )
+        for d in tenants_data
+    ]
+
+
+@router.get("/tenants/{tenant_id}", response_model=TenantResponse, dependencies=[Depends(get_current_admin)])
+async def get_tenant(tenant_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    tenant = await get_tenant_by_id(db, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return TenantResponse(
+        id=tenant.id,
+        name=tenant.name,
+        is_active=tenant.is_active,
+        app_count=len(tenant.apps),
+        created_at=tenant.created_at,
+    )
+
+
+@router.put("/tenants/{tenant_id}", response_model=TenantResponse, dependencies=[Depends(get_current_admin)])
+async def update_tenant_endpoint(tenant_id: uuid.UUID, req: TenantUpdateRequest, db: AsyncSession = Depends(get_db)):
+    tenant = await get_tenant_by_id(db, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    tenant = await update_tenant(db, tenant, req.name, req.password, req.is_active)
+    return TenantResponse(
+        id=tenant.id,
+        name=tenant.name,
+        is_active=tenant.is_active,
+        app_count=len(tenant.apps) if hasattr(tenant, 'apps') and tenant.apps else 0,
+        created_at=tenant.created_at,
+    )
+
+
+@router.delete("/tenants/{tenant_id}", dependencies=[Depends(get_current_admin)])
+async def delete_tenant_endpoint(tenant_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    tenant = await get_tenant_by_id(db, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    await delete_tenant(db, tenant)
+    return {"message": "deleted"}
 
 
 # --- Node Management ---
@@ -116,10 +196,15 @@ async def remove_node(node_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
 
 @router.post("/apps", response_model=AppCreateResponse, status_code=201, dependencies=[Depends(get_current_admin)])
 async def create_application(req: AppCreateRequest, db: AsyncSession = Depends(get_db)):
-    app, secret_plain = await create_app(db, req.name, req.max_concurrent, req.usage_limit, req.regions)
+    # Verify tenant exists
+    tenant = await db.get(Tenant, req.tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    app, secret_plain = await create_app(db, req.tenant_id, req.name, req.max_concurrent, req.usage_limit, req.regions)
     return AppCreateResponse(
         id=app.id,
         name=app.name,
+        tenant_id=app.tenant_id,
         api_key=app.api_key,
         api_secret=secret_plain,
         max_concurrent=app.max_concurrent,
@@ -135,6 +220,8 @@ async def list_apps(db: AsyncSession = Depends(get_db)):
         AppResponse(
             id=d["app"].id,
             name=d["app"].name,
+            tenant_id=d["app"].tenant_id,
+            tenant_name=d["tenant_name"],
             api_key=d["app"].api_key,
             max_concurrent=d["app"].max_concurrent,
             usage_limit=d["app"].usage_limit,
@@ -154,9 +241,12 @@ async def get_application(app_id: uuid.UUID, db: AsyncSession = Depends(get_db))
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
     active = await get_active_connection_count(db, app.id)
+    tenant = await db.get(Tenant, app.tenant_id)
     return AppResponse(
         id=app.id,
         name=app.name,
+        tenant_id=app.tenant_id,
+        tenant_name=tenant.name if tenant else "",
         api_key=app.api_key,
         max_concurrent=app.max_concurrent,
         usage_limit=app.usage_limit,
@@ -175,9 +265,12 @@ async def update_application(app_id: uuid.UUID, req: AppUpdateRequest, db: Async
         raise HTTPException(status_code=404, detail="App not found")
     app = await update_app(db, app, req.name, req.max_concurrent, req.usage_limit, req.regions, req.is_active)
     active = await get_active_connection_count(db, app.id)
+    tenant = await db.get(Tenant, app.tenant_id)
     return AppResponse(
         id=app.id,
         name=app.name,
+        tenant_id=app.tenant_id,
+        tenant_name=tenant.name if tenant else "",
         api_key=app.api_key,
         max_concurrent=app.max_concurrent,
         usage_limit=app.usage_limit,

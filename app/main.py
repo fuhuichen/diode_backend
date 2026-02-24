@@ -22,6 +22,9 @@ from app.database import get_db
 from app.models.application import Application
 from app.models.connection import Connection
 from app.models.node import Node
+from app.models.tenant import Tenant
+from app.services.app_service import get_active_connection_count
+from app.services.tenant_service import get_all_tenants, get_tenant_by_id
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -133,6 +136,10 @@ async def web_dashboard(request: Request, db: AsyncSession = Depends(get_db)):
 
     total_usage = sum(a.usage_count for a in apps)
 
+    # Tenant count
+    tenants_data = await get_all_tenants(db)
+    total_tenants = len(tenants_data)
+
     # Recent connections (last 10)
     recent_conns_result = await db.execute(
         select(Connection).order_by(Connection.connected_at.desc()).limit(10)
@@ -158,10 +165,64 @@ async def web_dashboard(request: Request, db: AsyncSession = Depends(get_db)):
         "active_connections": total_active,
         "total_connections": total_connections,
         "total_usage": total_usage,
+        "total_tenants": total_tenants,
         "nodes": nodes[:5],
         "apps": apps[:5],
         "recent_connections": recent_connections,
         "region_stats": region_stats,
+    })
+
+
+# --- Tenant Web Routes ---
+
+@app.get("/tenants", response_class=HTMLResponse)
+async def web_tenants(request: Request, db: AsyncSession = Depends(get_db)):
+    token = get_admin_token(request)
+    if not token:
+        return RedirectResponse(url=_prefix(request, "/login"))
+    try:
+        decode_jwt_token(token)
+    except Exception:
+        return RedirectResponse(url=_prefix(request, "/login"))
+
+    tenants_data = await get_all_tenants(db)
+    return templates.TemplateResponse("tenants.html", {"request": request, "tenants_data": tenants_data})
+
+
+@app.get("/tenants/{tenant_id}", response_class=HTMLResponse)
+async def web_tenant_detail(request: Request, tenant_id: str, db: AsyncSession = Depends(get_db)):
+    token = get_admin_token(request)
+    if not token:
+        return RedirectResponse(url=_prefix(request, "/login"))
+    try:
+        decode_jwt_token(token)
+    except Exception:
+        return RedirectResponse(url=_prefix(request, "/login"))
+
+    import uuid as uuid_mod
+    tenant = await get_tenant_by_id(db, uuid_mod.UUID(tenant_id))
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    # Build apps data with active connections
+    apps_data = []
+    for app_obj in tenant.apps:
+        active_count = await get_active_connection_count(db, app_obj.id)
+        apps_data.append({
+            "app": app_obj,
+            "regions": [r.region for r in app_obj.regions],
+            "active_connections": active_count,
+        })
+
+    # Get available regions from existing nodes
+    nodes_result = await db.execute(select(Node.region).distinct())
+    available_regions = sorted([row[0] for row in nodes_result.all()])
+
+    return templates.TemplateResponse("tenant_detail.html", {
+        "request": request,
+        "tenant": tenant,
+        "apps_data": apps_data,
+        "available_regions": available_regions,
     })
 
 
@@ -191,19 +252,29 @@ async def web_apps(request: Request, db: AsyncSession = Depends(get_db)):
         return RedirectResponse(url=_prefix(request, "/login"))
 
     result = await db.execute(
-        select(Application).options(selectinload(Application.regions)).order_by(Application.created_at.desc())
+        select(Application, Tenant.name.label("tenant_name"))
+        .join(Tenant, Application.tenant_id == Tenant.id)
+        .options(selectinload(Application.regions))
+        .order_by(Application.created_at.desc())
     )
-    apps = result.scalars().all()
+    rows = result.all()
 
     apps_data = []
-    for a in apps:
+    for row in rows:
+        a = row[0]
+        tenant_name = row[1]
         count_result = await db.execute(
             select(func.count()).select_from(Connection).where(
                 Connection.app_id == a.id, Connection.status == "active"
             )
         )
         active = count_result.scalar_one()
-        apps_data.append({"app": a, "regions": [r.region for r in a.regions], "active_connections": active})
+        apps_data.append({
+            "app": a,
+            "tenant_name": tenant_name,
+            "regions": [r.region for r in a.regions],
+            "active_connections": active,
+        })
 
     return templates.TemplateResponse("apps.html", {"request": request, "apps_data": apps_data})
 

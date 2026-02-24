@@ -3,6 +3,7 @@
 import asyncio
 
 from app.database import Base, engine
+from app.models.tenant import Tenant  # noqa: F401
 from app.models.node import Node  # noqa: F401
 from app.models.application import Application  # noqa: F401
 from app.models.app_region import AppRegion  # noqa: F401

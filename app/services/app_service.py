@@ -8,16 +8,18 @@ from app.api.deps import generate_api_key, generate_api_secret, hash_secret
 from app.models.app_region import AppRegion
 from app.models.application import Application
 from app.models.connection import Connection
+from app.models.tenant import Tenant
 
 
 async def create_app(
-    db: AsyncSession, name: str, max_concurrent: int, usage_limit: int, regions: list[str]
+    db: AsyncSession, tenant_id: uuid.UUID, name: str, max_concurrent: int, usage_limit: int, regions: list[str]
 ) -> tuple[Application, str]:
     api_key = generate_api_key()
     api_secret_plain = generate_api_secret()
     api_secret_hash = hash_secret(api_secret_plain)
 
     app = Application(
+        tenant_id=tenant_id,
         name=name,
         api_key=api_key,
         api_secret=api_secret_hash,
@@ -44,7 +46,32 @@ async def get_app_by_id(db: AsyncSession, app_id: uuid.UUID) -> Application | No
 
 async def get_all_apps(db: AsyncSession) -> list[dict]:
     result = await db.execute(
-        select(Application).options(selectinload(Application.regions)).order_by(Application.created_at.desc())
+        select(Application, Tenant.name.label("tenant_name"))
+        .join(Tenant, Application.tenant_id == Tenant.id)
+        .options(selectinload(Application.regions))
+        .order_by(Application.created_at.desc())
+    )
+    rows = result.all()
+    app_list = []
+    for row in rows:
+        app = row[0]
+        tenant_name = row[1]
+        active_count = await get_active_connection_count(db, app.id)
+        app_list.append({
+            "app": app,
+            "tenant_name": tenant_name,
+            "regions": [r.region for r in app.regions],
+            "active_connections": active_count,
+        })
+    return app_list
+
+
+async def get_apps_by_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> list[dict]:
+    result = await db.execute(
+        select(Application)
+        .options(selectinload(Application.regions))
+        .where(Application.tenant_id == tenant_id)
+        .order_by(Application.created_at.desc())
     )
     apps = result.scalars().all()
     app_list = []

@@ -5,15 +5,17 @@ from pydantic import BaseModel
 
 
 class AppCreateRequest(BaseModel):
+    tenant_id: uuid.UUID
     name: str
     max_concurrent: int = 10
-    usage_limit: int = 100000
+    usage_limit: int = 5
     regions: list[str]
 
 
 class AppCreateResponse(BaseModel):
     id: uuid.UUID
     name: str
+    tenant_id: uuid.UUID
     api_key: str
     api_secret: str
     max_concurrent: int
@@ -32,6 +34,8 @@ class AppUpdateRequest(BaseModel):
 class AppResponse(BaseModel):
     id: uuid.UUID
     name: str
+    tenant_id: uuid.UUID
+    tenant_name: str = ""
     api_key: str
     max_concurrent: int
     usage_limit: int

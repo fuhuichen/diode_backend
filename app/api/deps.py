@@ -13,6 +13,7 @@ from app.config import settings
 from app.database import get_db
 from app.models.application import Application
 from app.models.node import Node
+from app.models.tenant import Tenant
 
 
 def hash_secret(secret: str) -> str:
@@ -92,4 +93,10 @@ async def get_current_app(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API secret")
     if not app.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Application is disabled")
+
+    # Check tenant is active
+    tenant = await db.get(Tenant, app.tenant_id)
+    if not tenant or not tenant.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tenant is disabled")
+
     return app
