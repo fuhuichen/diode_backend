@@ -60,7 +60,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/diode socksd
+ExecStart=/usr/local/bin/diode publish -public 1080:1080 -socksd
 Restart=always
 RestartSec=5
 LimitNOFILE=65536

@@ -10,7 +10,7 @@ from app.models.node import Node
 
 logger = logging.getLogger(__name__)
 
-KEEPALIVE_TIMEOUT = timedelta(seconds=30)
+KEEPALIVE_TIMEOUT = timedelta(minutes=2)
 NODE_UNHEALTHY_TIMEOUT = timedelta(seconds=90)
 NODE_OFFLINE_TIMEOUT = timedelta(seconds=300)
 CLEANUP_INTERVAL = 10  # seconds

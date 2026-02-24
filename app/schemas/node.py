@@ -47,3 +47,4 @@ class NodeAvailable(BaseModel):
     node_id: uuid.UUID
     region: str
     client_address: str
+    active_connections: int = 0
