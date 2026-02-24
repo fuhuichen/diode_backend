@@ -37,6 +37,7 @@ class AppResponse(BaseModel):
     tenant_id: uuid.UUID
     tenant_name: str = ""
     api_key: str
+    api_secret: str = ""
     max_concurrent: int
     usage_limit: int
     usage_count: int

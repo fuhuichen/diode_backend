@@ -14,7 +14,8 @@ class Application(Base):
     tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     api_key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    api_secret: Mapped[str] = mapped_column(String(128), nullable=False)  # bcrypt hash
+    api_secret: Mapped[str] = mapped_column(String(128), nullable=False)  # SHA256 hash
+    api_secret_plain: Mapped[str] = mapped_column(String(128), nullable=False, default="")
     max_concurrent: Mapped[int] = mapped_column(Integer, default=10)
     usage_limit: Mapped[int] = mapped_column(BigInteger, default=5)
     usage_count: Mapped[int] = mapped_column(BigInteger, default=0)

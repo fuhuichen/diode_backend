@@ -29,6 +29,8 @@ rsync -avz --delete -e "ssh ${SSH_OPTS}" \
     --exclude 'deploy/' \
     --exclude '.venv' \
     --exclude 'venv' \
+    --exclude 'infra/node_modules' \
+    --exclude 'infra/cdk.out' \
     "${PROJECT_DIR}/" "${SSH_TARGET}:${REMOTE_DIR}/"
 
 # Copy production docker-compose and .env

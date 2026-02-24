@@ -23,6 +23,7 @@ async def create_app(
         name=name,
         api_key=api_key,
         api_secret=api_secret_hash,
+        api_secret_plain=api_secret_plain,
         max_concurrent=max_concurrent,
         usage_limit=usage_limit,
     )

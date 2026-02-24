@@ -93,7 +93,7 @@ async def web_login_post(request: Request, username: str = Form(...), password: 
         return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials"})
     token = create_jwt_token({"sub": username, "role": "admin"})
     response = RedirectResponse(url=_prefix(request, "/dashboard"), status_code=303)
-    response.set_cookie("admin_token", token, httponly=True, max_age=86400, path=request.scope.get("root_path", "") or "/")
+    response.set_cookie("admin_token", token, httponly=False, max_age=86400, path=request.scope.get("root_path", "") or "/")
     return response
 
 
