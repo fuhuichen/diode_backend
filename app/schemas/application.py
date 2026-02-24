@@ -8,7 +8,7 @@ class AppCreateRequest(BaseModel):
     tenant_id: uuid.UUID
     name: str
     max_concurrent: int = 10
-    usage_limit: int = 5
+    usage_limit: int = 1073741824
     regions: list[str]
 
 
@@ -40,7 +40,7 @@ class AppResponse(BaseModel):
     api_secret: str = ""
     max_concurrent: int
     usage_limit: int
-    usage_count: int
+    usage_bytes: int
     is_active: bool
     regions: list[str]
     active_connections: int = 0

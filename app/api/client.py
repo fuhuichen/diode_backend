@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_app
 from app.database import get_db
 from app.models.application import Application
+from app.models.connection import Connection
 from app.schemas.connection import (
     ConnectRequest,
     ConnectResponse,
@@ -35,13 +37,31 @@ async def list_available_nodes(
     nodes = await get_available_nodes(db, app)
     if req.region:
         nodes = [n for n in nodes if n.region == req.region]
-    return {
-        "nodes": [
-            NodeAvailable(node_id=n.id, region=n.region, client_address=n.client_address)
-            for n in nodes
-            if n.client_address
-        ]
-    }
+
+    # Count active connections per node
+    node_ids = [n.id for n in nodes if n.client_address]
+    active_counts: dict = {}
+    if node_ids:
+        count_result = await db.execute(
+            select(Connection.node_id, func.count())
+            .where(Connection.node_id.in_(node_ids), Connection.status == "active")
+            .group_by(Connection.node_id)
+        )
+        active_counts = dict(count_result.all())
+
+    node_list = [
+        NodeAvailable(
+            node_id=n.id,
+            region=n.region,
+            client_address=n.client_address,
+            active_connections=active_counts.get(n.id, 0),
+        )
+        for n in nodes
+        if n.client_address
+    ]
+    node_list.sort(key=lambda x: x.active_connections)
+
+    return {"nodes": node_list}
 
 
 @router.post("/connect", response_model=ConnectResponse)
@@ -78,10 +98,10 @@ async def keepalive(
     app: Application = Depends(get_current_app),
     db: AsyncSession = Depends(get_db),
 ):
-    ok = await keepalive_connection(db, req.session_id, app.id)
-    if not ok:
+    result = await keepalive_connection(db, req.session_id, app.id, req.bytes_up, req.bytes_down)
+    if result is None:
         raise HTTPException(status_code=404, detail="Session not found or already closed")
-    return {"message": "ok"}
+    return {"message": "ok", "warning": result["warning"]}
 
 
 @router.post("/disconnect")

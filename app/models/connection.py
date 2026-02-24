@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Index, String
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -21,6 +21,8 @@ class Connection(Base):
     connected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+    bytes_up: Mapped[int] = mapped_column(BigInteger, default=0)
+    bytes_down: Mapped[int] = mapped_column(BigInteger, default=0)
     disconnected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     application = relationship("Application")

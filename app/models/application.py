@@ -18,8 +18,8 @@ class Application(Base):
     api_secret: Mapped[str] = mapped_column(String(128), nullable=False)  # SHA256 hash
     api_secret_plain: Mapped[str] = mapped_column(String(128), nullable=False, default="")
     max_concurrent: Mapped[int] = mapped_column(Integer, default=10)
-    usage_limit: Mapped[int] = mapped_column(BigInteger, default=5)
-    usage_count: Mapped[int] = mapped_column(BigInteger, default=0)
+    usage_limit: Mapped[int] = mapped_column(BigInteger, default=1073741824)
+    usage_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

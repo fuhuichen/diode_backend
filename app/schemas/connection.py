@@ -16,6 +16,8 @@ class ConnectResponse(BaseModel):
 
 class KeepaliveRequest(BaseModel):
     session_id: str
+    bytes_up: int = 0
+    bytes_down: int = 0
 
 
 class DisconnectRequest(BaseModel):
@@ -32,6 +34,8 @@ class ConnectionResponse(BaseModel):
     node_id: uuid.UUID
     session_id: str
     status: str
+    bytes_up: int
+    bytes_down: int
     last_keepalive: datetime
     connected_at: datetime
     disconnected_at: datetime | None

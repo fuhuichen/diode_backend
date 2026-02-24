@@ -41,7 +41,12 @@
                     <span class="font-bold text-orange-600">{{ d.active_connections }}</span> / {{ d.app.max_concurrent }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">
-                    {{ d.app.usage_count }} / {{ d.app.usage_limit }}
+                    {% if d.app.usage_bytes >= d.app.usage_limit %}
+                    <span class="text-amber-600 font-semibold">{{ d.app.usage_bytes | format_gb }}</span>
+                    {% else %}
+                    {{ d.app.usage_bytes | format_gb }}
+                    {% endif %}
+                     / {{ d.app.usage_limit | format_gb }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     {% if d.app.is_active %}

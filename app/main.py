@@ -59,6 +59,22 @@ templates_dir = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
 
 
+def format_gb(value: int) -> str:
+    """Convert bytes to GB display with 2 decimal places."""
+    gb = value / (1024 ** 3)
+    return f"{gb:.2f} GB"
+
+
+def format_mb(value: int) -> str:
+    """Convert bytes to MB display with 1 decimal place."""
+    mb = value / (1024 ** 2)
+    return f"{mb:.1f} MB"
+
+
+templates.env.filters["format_gb"] = format_gb
+templates.env.filters["format_mb"] = format_mb
+
+
 # --- Web UI Routes ---
 
 def get_admin_token(request: Request) -> str | None:
@@ -134,7 +150,7 @@ async def web_dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     total_conns = await db.execute(select(func.count()).select_from(Connection))
     total_connections = total_conns.scalar_one()
 
-    total_usage = sum(a.usage_count for a in apps)
+    total_usage = sum(a.usage_bytes for a in apps)
 
     # Tenant count
     tenants_data = await get_all_tenants(db)

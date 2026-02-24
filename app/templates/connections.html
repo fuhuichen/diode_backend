@@ -11,6 +11,9 @@
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">App</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Node</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Upload</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Download</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usage</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Keepalive</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Connected</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Disconnected</th>
@@ -34,6 +37,15 @@
                     {% else %}
                     <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">closed</span>
                     {% endif %}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {{ conn.bytes_up | format_mb }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {{ conn.bytes_down | format_mb }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {{ (conn.bytes_up + conn.bytes_down) | format_mb }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                     {{ conn.last_keepalive.strftime('%H:%M:%S') }}

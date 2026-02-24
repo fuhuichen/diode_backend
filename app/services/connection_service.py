@@ -41,8 +41,8 @@ async def create_connection(
     )
     app = result.scalar_one()
 
-    # Check usage limit
-    if app.usage_count >= app.usage_limit:
+    # Check hard usage limit (120%)
+    if app.usage_bytes >= int(app.usage_limit * 1.2):
         raise UsageLimitError("使用量已達上限")
 
     # Count active connections
@@ -66,14 +66,17 @@ async def create_connection(
 
     # Create connection
     conn = Connection(app_id=app_id, node_id=node_id, session_id=session_id)
-    app.usage_count += 1
     db.add(conn)
     await db.commit()
     await db.refresh(conn)
     return conn
 
 
-async def keepalive_connection(db: AsyncSession, session_id: str, app_id: uuid.UUID) -> bool:
+async def keepalive_connection(
+    db: AsyncSession, session_id: str, app_id: uuid.UUID,
+    bytes_up: int = 0, bytes_down: int = 0,
+) -> dict | None:
+    """Returns dict with warning flag, or None if session not found."""
     result = await db.execute(
         select(Connection).where(
             Connection.session_id == session_id,
@@ -83,10 +86,30 @@ async def keepalive_connection(db: AsyncSession, session_id: str, app_id: uuid.U
     )
     conn = result.scalar_one_or_none()
     if not conn:
-        return False
+        return None
     conn.last_keepalive = datetime.now(timezone.utc)
+    conn.bytes_up += bytes_up
+    conn.bytes_down += bytes_down
+
+    # Atomic increment of application usage_bytes
+    delta = bytes_up + bytes_down
+    if delta > 0:
+        await db.execute(
+            update(Application)
+            .where(Application.id == app_id)
+            .values(usage_bytes=Application.usage_bytes + delta)
+        )
+
     await db.commit()
-    return True
+
+    # Check soft limit for warning
+    app_result = await db.execute(
+        select(Application.usage_bytes, Application.usage_limit).where(Application.id == app_id)
+    )
+    row = app_result.one()
+    warning = row.usage_bytes >= row.usage_limit
+
+    return {"warning": warning}
 
 
 async def disconnect_connection(db: AsyncSession, session_id: str, app_id: uuid.UUID) -> bool:
