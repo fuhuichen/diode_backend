@@ -11,6 +11,17 @@ from app.models.connection import Connection
 from app.models.tenant import Tenant
 
 
+async def check_app_name_unique(
+    db: AsyncSession, tenant_id: uuid.UUID, name: str, exclude_app_id: uuid.UUID | None = None
+) -> bool:
+    """Return True if the name is unique within the tenant, False if duplicate."""
+    query = select(Application).where(Application.tenant_id == tenant_id, Application.name == name)
+    if exclude_app_id is not None:
+        query = query.where(Application.id != exclude_app_id)
+    result = await db.execute(query)
+    return result.scalar_one_or_none() is None
+
+
 async def create_app(
     db: AsyncSession, tenant_id: uuid.UUID, name: str, max_concurrent: int, usage_limit: int, regions: list[str]
 ) -> tuple[Application, str]:

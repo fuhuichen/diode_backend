@@ -304,12 +304,17 @@ async def web_app_detail(request: Request, app_id: str, db: AsyncSession = Depen
 
     active_count = sum(1 for c in connections if c.status == "active")
 
+    # Get available regions from existing nodes
+    nodes_result = await db.execute(select(Node.region).distinct())
+    available_regions = sorted([row[0] for row in nodes_result.all()])
+
     return templates.TemplateResponse("app_detail.html", {
         "request": request,
         "app": app_obj,
         "regions": [r.region for r in app_obj.regions],
         "connections": connections,
         "active_connections": active_count,
+        "available_regions": available_regions,
     })
 
 

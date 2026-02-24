@@ -25,6 +25,7 @@ from app.schemas.application import (
 from app.schemas.node import NodeCreateRequest, NodeCreateResponse, NodeResponse
 from app.schemas.tenant import TenantCreateRequest, TenantResponse, TenantUpdateRequest
 from app.services.app_service import (
+    check_app_name_unique,
     create_app,
     delete_app,
     get_active_connection_count,
@@ -200,6 +201,8 @@ async def create_application(req: AppCreateRequest, db: AsyncSession = Depends(g
     tenant = await db.get(Tenant, req.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
+    if not await check_app_name_unique(db, req.tenant_id, req.name):
+        raise HTTPException(status_code=409, detail="An app with this name already exists for this tenant")
     app, secret_plain = await create_app(db, req.tenant_id, req.name, req.max_concurrent, req.usage_limit, req.regions)
     return AppCreateResponse(
         id=app.id,
@@ -265,6 +268,8 @@ async def update_application(app_id: uuid.UUID, req: AppUpdateRequest, db: Async
     app = await get_app_by_id(db, app_id)
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
+    if req.name is not None and not await check_app_name_unique(db, app.tenant_id, req.name, exclude_app_id=app.id):
+        raise HTTPException(status_code=409, detail="An app with this name already exists for this tenant")
     app = await update_app(db, app, req.name, req.max_concurrent, req.usage_limit, req.regions, req.is_active)
     active = await get_active_connection_count(db, app.id)
     tenant = await db.get(Tenant, app.tenant_id)
