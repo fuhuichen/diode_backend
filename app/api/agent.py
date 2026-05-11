@@ -30,7 +30,12 @@ async def heartbeat(
     node: Node = Depends(get_current_node),
     db: AsyncSession = Depends(get_db),
 ):
-    await heartbeat_node(db, node, req.client_address)
+    await heartbeat_node(
+        db, node, req.client_address,
+        probe_ok=req.probe_ok,
+        probe_latency_ms=req.probe_latency_ms,
+        probe_error=req.probe_error,
+    )
     return {"message": "ok"}
 
 

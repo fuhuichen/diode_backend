@@ -37,10 +37,12 @@
                 {% set rp = request.scope.get('root_path', '') %}
                 {% set current_path = request.url.path %}
                 <a href="{{ rp }}/dashboard" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if current_path.endswith('/dashboard') %}active text-white{% else %}text-indigo-100{% endif %}">Dashboard</a>
+                <a href="{{ rp }}/stats" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if current_path.endswith('/stats') %}active text-white{% else %}text-indigo-100{% endif %}">Statistics</a>
                 <a href="{{ rp }}/tenants" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if '/tenants' in current_path %}active text-white{% else %}text-indigo-100{% endif %}">Tenants</a>
                 <a href="{{ rp }}/nodes" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if current_path.endswith('/nodes') %}active text-white{% else %}text-indigo-100{% endif %}">Nodes</a>
                 <a href="{{ rp }}/apps" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if '/apps' in current_path %}active text-white{% else %}text-indigo-100{% endif %}">Apps</a>
                 <a href="{{ rp }}/connections" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if current_path.endswith('/connections') %}active text-white{% else %}text-indigo-100{% endif %}">Connections</a>
+                <a href="{{ rp }}/clientlogs" class="nav-link px-4 py-5 text-sm font-medium hover:text-indigo-200 {% if '/clientlogs' in current_path %}active text-white{% else %}text-indigo-100{% endif %}">Client Logs</a>
                 <div class="w-px h-6 bg-indigo-400/50 mx-2"></div>
                 <a href="{{ rp }}/logout" class="px-3 py-1.5 text-sm text-indigo-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Logout</a>
             </div>

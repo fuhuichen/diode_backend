@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Client Log Detail - Diode Backend{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <a href="{{ request.scope.get('root_path', '') }}/clientlogs" class="text-sm text-brand-600 hover:text-brand-800">← 回列表</a>
+    <h1 class="text-2xl font-bold mt-2">Client Log</h1>
+    <p class="text-sm text-gray-500"><code>{{ date }}/{{ filename }}</code></p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    <div class="bg-white rounded-lg shadow p-5">
+        <h2 class="font-semibold mb-3 text-gray-700">基本資訊</h2>
+        <dl class="space-y-2 text-sm">
+            {% set fields = [
+                ('收到時間', entry.received_at),
+                ('App', entry.app_name),
+                ('Flavor', entry.flavor),
+                ('App 版本', entry.app_version),
+                ('Version Code', entry.version_code),
+                ('Package', entry.package_name),
+                ('嘗試次數', entry.attempt_count),
+                ('Client IP', entry.client_ip),
+                ('User-Agent', entry.user_agent),
+            ] %}
+            {% for label, value in fields %}
+            <div class="flex">
+                <dt class="w-32 text-gray-500 flex-shrink-0">{{ label }}</dt>
+                <dd class="text-gray-800 break-all">{{ value if value not in [None, ''] else '-' }}</dd>
+            </div>
+            {% endfor %}
+        </dl>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-5">
+        <h2 class="font-semibold mb-3 text-gray-700">裝置 / 環境</h2>
+        <dl class="space-y-2 text-sm">
+            {% set device_fields = [
+                ('品牌', entry.device_brand),
+                ('型號', entry.device_model),
+                ('製造商', entry.manufacturer),
+                ('Device', entry.device),
+                ('Hardware', entry.hardware),
+                ('Fingerprint', entry.fingerprint),
+                ('ABI', entry.abi),
+                ('OS', entry.os_version),
+                ('SDK Int', entry.sdk_int),
+                ('Locale', entry.locale),
+                ('Timezone', entry.timezone),
+                ('Network', entry.network_type),
+            ] %}
+            {% for label, value in device_fields %}
+            <div class="flex">
+                <dt class="w-28 text-gray-500 flex-shrink-0">{{ label }}</dt>
+                <dd class="text-gray-800 break-all">{{ value if value not in [None, ''] else '-' }}</dd>
+            </div>
+            {% endfor %}
+        </dl>
+    </div>
+</div>
+
+{% if entry.last_error %}
+<div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+    <h2 class="font-semibold text-red-800 mb-1">最後錯誤訊息</h2>
+    <pre class="text-sm text-red-700 whitespace-pre-wrap break-all">{{ entry.last_error }}</pre>
+</div>
+{% endif %}
+
+<div class="bg-white rounded-lg shadow p-5">
+    <div class="flex items-center justify-between mb-3">
+        <h2 class="font-semibold text-gray-700">Logcat（自進程，過濾 Diode tag）</h2>
+        <button onclick="navigator.clipboard.writeText(document.getElementById('logtext').innerText); this.innerText='已複製';" class="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded">複製全部</button>
+    </div>
+    <pre id="logtext" class="bg-gray-900 text-green-200 text-xs font-mono p-4 rounded overflow-auto max-h-[600px] whitespace-pre-wrap break-all">{{ entry.log_text }}</pre>
+</div>
+{% endblock %}

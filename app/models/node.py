@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Index, String
+from sqlalchemy import Boolean, DateTime, Float, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -17,6 +17,11 @@ class Node(Base):
     client_address: Mapped[str | None] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(String(20), default="offline")
     last_heartbeat: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    probe_ok: Mapped[bool | None] = mapped_column(Boolean, default=None)
+    probe_latency_ms: Mapped[float | None] = mapped_column(Float, default=None)
+    probe_error: Mapped[str | None] = mapped_column(String(500), default=None)
+    probe_fail_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_probe_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

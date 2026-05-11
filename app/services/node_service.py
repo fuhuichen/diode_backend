@@ -17,10 +17,28 @@ async def register_node(db: AsyncSession, node: Node, region: str, name: str | N
     return node
 
 
-async def heartbeat_node(db: AsyncSession, node: Node, client_address: str) -> None:
+async def heartbeat_node(
+    db: AsyncSession,
+    node: Node,
+    client_address: str,
+    probe_ok: bool | None = None,
+    probe_latency_ms: float | None = None,
+    probe_error: str | None = None,
+) -> None:
     node.client_address = client_address
     node.status = "online"
     node.last_heartbeat = datetime.now(timezone.utc)
+
+    if probe_ok is not None:
+        node.probe_ok = probe_ok
+        node.probe_latency_ms = probe_latency_ms
+        node.probe_error = probe_error
+        node.last_probe_at = datetime.now(timezone.utc)
+        if probe_ok:
+            node.probe_fail_count = 0
+        else:
+            node.probe_fail_count = (node.probe_fail_count or 0) + 1
+
     await db.commit()
 
 

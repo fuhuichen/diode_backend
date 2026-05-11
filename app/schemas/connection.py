@@ -28,6 +28,30 @@ class NodesRequest(BaseModel):
     region: str | None = None
 
 
+class ClientLogRequest(BaseModel):
+    # 既有
+    device_brand: str | None = None
+    device_model: str | None = None
+    os_version: str | None = None
+    app_version: str | None = None
+    flavor: str | None = None
+    attempt_count: int = 0
+    last_error: str | None = None
+    log_text: str
+    # 新增：更多裝置/環境資訊（皆選填，舊版客戶端不會傳）
+    manufacturer: str | None = None
+    device: str | None = None
+    hardware: str | None = None
+    fingerprint: str | None = None
+    abi: str | None = None
+    locale: str | None = None
+    timezone: str | None = None
+    network_type: str | None = None
+    package_name: str | None = None
+    version_code: int | None = None
+    sdk_int: int | None = None
+
+
 class ConnectionResponse(BaseModel):
     id: uuid.UUID
     app_id: uuid.UUID

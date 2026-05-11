@@ -1,4 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+import json
+import logging
+from datetime import datetime, timezone
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -7,6 +12,7 @@ from app.database import get_db
 from app.models.application import Application
 from app.models.connection import Connection
 from app.schemas.connection import (
+    ClientLogRequest,
     ConnectRequest,
     ConnectResponse,
     DisconnectRequest,
@@ -14,6 +20,11 @@ from app.schemas.connection import (
     KeepaliveRequest,
     NodesRequest,
 )
+
+CLIENT_LOG_DIR = Path("clientlogs")
+MAX_LOG_TEXT_BYTES = 256 * 1024
+
+logger = logging.getLogger(__name__)
 from app.schemas.node import NodeAvailable
 from app.services.connection_service import (
     MaxConcurrentError,
@@ -114,3 +125,71 @@ async def disconnect(
     if not ok:
         raise HTTPException(status_code=404, detail="Session not found or already closed")
     return {"message": "disconnected"}
+
+
+def _extract_client_ip(request: Request) -> str:
+    """nginx / proxy 後面取真實 IP；X-Forwarded-For 取第一個（client 端）"""
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    real_ip = request.headers.get("x-real-ip", "")
+    if real_ip:
+        return real_ip.strip()
+    return request.client.host if request.client else ""
+
+
+@router.post("/clientlog")
+async def submit_client_log(
+    req: ClientLogRequest,
+    request: Request,
+    app: Application = Depends(get_current_app),
+):
+    text = req.log_text or ""
+    if len(text.encode("utf-8", errors="ignore")) > MAX_LOG_TEXT_BYTES:
+        text = text.encode("utf-8", errors="ignore")[:MAX_LOG_TEXT_BYTES].decode("utf-8", errors="ignore")
+
+    client_ip = _extract_client_ip(request)
+    user_agent = request.headers.get("user-agent", "")
+
+    now = datetime.now(timezone.utc)
+    day_dir = CLIENT_LOG_DIR / now.strftime("%Y-%m-%d")
+    day_dir.mkdir(parents=True, exist_ok=True)
+    fname = f"{now.strftime('%H%M%S_%f')}_{app.id}_{req.flavor or 'unknown'}.json"
+    fpath = day_dir / fname
+
+    payload = {
+        "received_at": now.isoformat(),
+        "app_id": str(app.id),
+        "app_name": app.name,
+        "client_ip": client_ip,
+        "user_agent": user_agent,
+        "device_brand": req.device_brand,
+        "device_model": req.device_model,
+        "manufacturer": req.manufacturer,
+        "device": req.device,
+        "hardware": req.hardware,
+        "fingerprint": req.fingerprint,
+        "abi": req.abi,
+        "os_version": req.os_version,
+        "sdk_int": req.sdk_int,
+        "locale": req.locale,
+        "timezone": req.timezone,
+        "network_type": req.network_type,
+        "package_name": req.package_name,
+        "app_version": req.app_version,
+        "version_code": req.version_code,
+        "flavor": req.flavor,
+        "attempt_count": req.attempt_count,
+        "last_error": req.last_error,
+        "log_text": text,
+    }
+    try:
+        fpath.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        logger.info(
+            "client log saved: app=%s flavor=%s device=%s/%s ip=%s attempts=%s file=%s",
+            app.name, req.flavor, req.device_brand, req.device_model, client_ip, req.attempt_count, fpath.name,
+        )
+    except OSError as e:
+        logger.error("failed to write client log: %s", e)
+        raise HTTPException(status_code=500, detail="failed to persist log")
+    return {"message": "ok", "file": fpath.name}

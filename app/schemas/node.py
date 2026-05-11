@@ -17,6 +17,9 @@ class AgentRegisterResponse(BaseModel):
 class AgentHeartbeatRequest(BaseModel):
     client_address: str
     status: str = "running"
+    probe_ok: bool | None = None
+    probe_latency_ms: float | None = None
+    probe_error: str | None = None
 
 
 class NodeCreateRequest(BaseModel):
@@ -38,6 +41,11 @@ class NodeResponse(BaseModel):
     client_address: str | None
     status: str
     last_heartbeat: datetime | None
+    probe_ok: bool | None = None
+    probe_latency_ms: float | None = None
+    probe_error: str | None = None
+    probe_fail_count: int = 0
+    last_probe_at: datetime | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

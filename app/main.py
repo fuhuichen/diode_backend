@@ -1,6 +1,8 @@
 import asyncio
+import json
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -189,6 +191,18 @@ async def web_dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     })
 
 
+@app.get("/stats", response_class=HTMLResponse)
+async def web_stats(request: Request):
+    token = get_admin_token(request)
+    if not token:
+        return RedirectResponse(url=_prefix(request, "/login"))
+    try:
+        decode_jwt_token(token)
+    except Exception:
+        return RedirectResponse(url=_prefix(request, "/login"))
+    return templates.TemplateResponse("stats.html", {"request": request})
+
+
 # --- Tenant Web Routes ---
 
 @app.get("/tenants", response_class=HTMLResponse)
@@ -331,6 +345,103 @@ async def web_app_detail(request: Request, app_id: str, db: AsyncSession = Depen
         "connections": connections,
         "active_connections": active_count,
         "available_regions": available_regions,
+    })
+
+
+# --- Client Logs Web Routes ---
+
+CLIENTLOG_ROOT = Path("clientlogs")
+SAFE_NAME = re.compile(r"^[A-Za-z0-9_.\-]+$")
+SAFE_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _require_admin_or_redirect(request: Request):
+    token = get_admin_token(request)
+    if not token:
+        return RedirectResponse(url=_prefix(request, "/login"))
+    try:
+        decode_jwt_token(token)
+    except Exception:
+        return RedirectResponse(url=_prefix(request, "/login"))
+    return None
+
+
+@app.get("/clientlogs", response_class=HTMLResponse)
+async def web_clientlogs(request: Request, q: str = "", flavor: str = "", limit: int = 200):
+    redirect = _require_admin_or_redirect(request)
+    if redirect:
+        return redirect
+
+    entries: list[dict] = []
+    if CLIENTLOG_ROOT.exists():
+        for date_dir in sorted(CLIENTLOG_ROOT.iterdir(), reverse=True):
+            if not date_dir.is_dir() or not SAFE_DATE.match(date_dir.name):
+                continue
+            for f in sorted(date_dir.iterdir(), reverse=True):
+                if f.suffix != ".json":
+                    continue
+                try:
+                    data = json.loads(f.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    continue
+                if flavor and data.get("flavor") != flavor:
+                    continue
+                if q:
+                    hay = " ".join(str(v) for v in data.values() if v).lower()
+                    if q.lower() not in hay:
+                        continue
+                entries.append({
+                    "date": date_dir.name,
+                    "filename": f.name,
+                    "received_at": data.get("received_at", ""),
+                    "app_name": data.get("app_name", ""),
+                    "flavor": data.get("flavor", ""),
+                    "device_brand": data.get("device_brand", ""),
+                    "device_model": data.get("device_model", ""),
+                    "os_version": data.get("os_version", ""),
+                    "app_version": data.get("app_version", ""),
+                    "client_ip": data.get("client_ip", ""),
+                    "attempt_count": data.get("attempt_count", 0),
+                    "last_error": data.get("last_error", "") or "",
+                })
+                if len(entries) >= limit:
+                    break
+            if len(entries) >= limit:
+                break
+
+    # 蒐集去重 flavor 給篩選下拉
+    flavors = sorted({e["flavor"] for e in entries if e["flavor"]})
+    return templates.TemplateResponse("clientlogs.html", {
+        "request": request,
+        "entries": entries,
+        "q": q,
+        "flavor": flavor,
+        "flavors": flavors,
+        "limit": limit,
+    })
+
+
+@app.get("/clientlogs/{date}/{filename}", response_class=HTMLResponse)
+async def web_clientlog_detail(request: Request, date: str, filename: str):
+    redirect = _require_admin_or_redirect(request)
+    if redirect:
+        return redirect
+
+    if not SAFE_DATE.match(date) or not SAFE_NAME.match(filename):
+        raise HTTPException(status_code=400, detail="invalid path")
+    fpath = (CLIENTLOG_ROOT / date / filename).resolve()
+    root = CLIENTLOG_ROOT.resolve()
+    if not str(fpath).startswith(str(root)) or not fpath.exists():
+        raise HTTPException(status_code=404, detail="not found")
+    try:
+        data = json.loads(fpath.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raise HTTPException(status_code=500, detail="failed to parse log")
+    return templates.TemplateResponse("clientlog_detail.html", {
+        "request": request,
+        "entry": data,
+        "date": date,
+        "filename": filename,
     })
 
 

@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 KEEPALIVE_TIMEOUT = timedelta(minutes=2)
 NODE_UNHEALTHY_TIMEOUT = timedelta(seconds=90)
 NODE_OFFLINE_TIMEOUT = timedelta(seconds=300)
+PROBE_FAIL_THRESHOLD = 3
 CLEANUP_INTERVAL = 10  # seconds
 
 
@@ -63,6 +64,24 @@ async def check_node_health():
         await db.commit()
 
 
+async def check_probe_health():
+    """Mark nodes unhealthy if SOCKS5 probe has failed consecutively."""
+    async with async_session() as db:
+        result = await db.execute(
+            update(Node)
+            .where(
+                Node.status == "online",
+                Node.probe_fail_count >= PROBE_FAIL_THRESHOLD,
+            )
+            .values(status="unhealthy")
+            .returning(Node.id)
+        )
+        flagged = result.all()
+        if flagged:
+            logger.warning(f"Marked {len(flagged)} node(s) unhealthy due to probe failures")
+        await db.commit()
+
+
 async def run_cleanup_loop():
     """Background loop that runs cleanup tasks every 10 seconds."""
     logger.info("Starting background cleanup loop")
@@ -70,6 +89,7 @@ async def run_cleanup_loop():
         try:
             await cleanup_stale_connections()
             await check_node_health()
+            await check_probe_health()
         except Exception:
             logger.exception("Error in cleanup loop")
         await asyncio.sleep(CLEANUP_INTERVAL)

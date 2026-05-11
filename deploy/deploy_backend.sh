@@ -4,14 +4,12 @@ set -euo pipefail
 # ── Config ──────────────────────────────────────────────────────
 REMOTE_USER="ubuntu"
 REMOTE_HOST="13.213.186.48"
-REMOTE_DIR="/opt/diode_backend"
+REMOTE_DIR="/mnt/data/diode_backend"
 SSH_KEY="${SSH_KEY:-$HOME/work/certs/BillingKey.pem}"
 SSH_OPTS="-i ${SSH_KEY} -o StrictHostKeyChecking=accept-new"
 SSH_TARGET="${REMOTE_USER}@${REMOTE_HOST}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-NGINX_MARKER_START="# --- DIODE BACKEND START ---"
-NGINX_MARKER_END="# --- DIODE BACKEND END ---"
 
 echo "=== Diode Backend Deployment ==="
 echo "Target: ${SSH_TARGET}:${REMOTE_DIR}"
@@ -62,63 +60,33 @@ echo "[4/6] Initializing database tables..."
 ssh ${SSH_OPTS} "${SSH_TARGET}" "cd ${REMOTE_DIR} && sudo docker compose exec -T backend python -m init_db"
 echo "   Database initialized."
 
-# ── Step 5: Configure nginx ────────────────────────────────────
+# ── Step 5: Configure nginx (conf.d) ─────────────────────────────
 echo "[5/6] Configuring nginx..."
 
-# Find the active nginx config
-NGINX_CONF=$(ssh ${SSH_OPTS} "${SSH_TARGET}" "sudo nginx -t 2>&1 | grep -oP '(?<=file ).*(?= test)' || echo '/etc/nginx/nginx.conf'")
-# Typically the sites-enabled default or nginx.conf contains the server block
-NGINX_SITE=$(ssh ${SSH_OPTS} "${SSH_TARGET}" "ls /etc/nginx/sites-enabled/default 2>/dev/null && echo '/etc/nginx/sites-enabled/default' || echo '${NGINX_CONF}'" | head -1)
-
-echo "   Using nginx config: ${NGINX_SITE}"
-
-# Check if diode block already exists
-if ssh ${SSH_OPTS} "${SSH_TARGET}" "sudo grep -q '${NGINX_MARKER_START}' '${NGINX_SITE}'" 2>/dev/null; then
-    echo "   Diode nginx config already present, updating..."
-    # Remove old block and re-inject
-    ssh ${SSH_OPTS} "${SSH_TARGET}" "sudo sed -i '/${NGINX_MARKER_START//\//\\/}/,/${NGINX_MARKER_END//\//\\/}/d' '${NGINX_SITE}'"
-fi
-
-# Backup nginx config
-ssh ${SSH_OPTS} "${SSH_TARGET}" "sudo cp '${NGINX_SITE}' '${NGINX_SITE}.bak.$(date +%Y%m%d%H%M%S)'"
-
-# Inject the diode location block before the last closing brace of the server block
-# We find the last "}" in the server block and insert before it
-DIODE_CONF=$(cat "${SCRIPT_DIR}/nginx-diode.conf")
 ssh ${SSH_OPTS} "${SSH_TARGET}" "
-    # Find line number of the last closing brace in the server block
-    # Insert diode config before the closing brace of the main server block
-    LAST_BRACE=\$(sudo grep -n '}' '${NGINX_SITE}' | tail -1 | cut -d: -f1)
-    if [ -z \"\$LAST_BRACE\" ]; then
-        echo 'ERROR: Could not find closing brace in nginx config'
-        exit 1
-    fi
-    sudo sed -i \"\${LAST_BRACE}i\\
-\\
-    ${NGINX_MARKER_START}\\
-    location /diode/ {\\
-        proxy_pass http://127.0.0.1:8000/;\\
-        proxy_set_header Host \\\$host;\\
-        proxy_set_header X-Real-IP \\\$remote_addr;\\
-        proxy_set_header X-Forwarded-For \\\$proxy_add_x_forwarded_for;\\
-        proxy_set_header X-Forwarded-Proto \\\$scheme;\\
-        proxy_http_version 1.1;\\
-        proxy_read_timeout 300s;\\
-    }\\
-    ${NGINX_MARKER_END}\" '${NGINX_SITE}'
+cat <<'NGINX_EOF' | sudo tee /etc/nginx/conf.d/diode.conf > /dev/null
+server {
+    listen 80;
+    server_name _;
+    location /diode/ {
+        proxy_pass http://127.0.0.1:8000/;
+        proxy_set_header Host \\\$host;
+        proxy_set_header X-Real-IP \\\$remote_addr;
+        proxy_set_header X-Forwarded-For \\\$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \\\$scheme;
+        proxy_http_version 1.1;
+        proxy_read_timeout 300s;
+    }
+}
+NGINX_EOF
 "
 
-# Test nginx config
 echo "   Testing nginx configuration..."
 if ssh ${SSH_OPTS} "${SSH_TARGET}" "sudo nginx -t" 2>&1; then
     ssh ${SSH_OPTS} "${SSH_TARGET}" "sudo systemctl reload nginx"
     echo "   Nginx reloaded."
 else
-    echo "   ERROR: nginx config test failed! Restoring backup..."
-    LATEST_BACKUP=$(ssh ${SSH_OPTS} "${SSH_TARGET}" "ls -t ${NGINX_SITE}.bak.* 2>/dev/null | head -1")
-    if [ -n "${LATEST_BACKUP}" ]; then
-        ssh ${SSH_OPTS} "${SSH_TARGET}" "sudo cp '${LATEST_BACKUP}' '${NGINX_SITE}' && sudo systemctl reload nginx"
-    fi
+    echo "   ERROR: nginx config test failed!"
     exit 1
 fi
 

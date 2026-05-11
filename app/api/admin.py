@@ -1,7 +1,8 @@
 import uuid
+from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import cast, Date, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import (
@@ -24,6 +25,7 @@ from app.schemas.application import (
 )
 from app.schemas.node import NodeCreateRequest, NodeCreateResponse, NodeResponse
 from app.schemas.tenant import TenantCreateRequest, TenantResponse, TenantUpdateRequest
+from app.models.application import Application
 from app.services.app_service import (
     check_app_name_unique,
     create_app,
@@ -94,6 +96,130 @@ async def dashboard(db: AsyncSession = Depends(get_db)):
         "total_apps": total_apps,
         "active_connections": total_active,
         "total_tenants": total_tenants,
+    }
+
+
+# --- Statistics ---
+
+@router.get("/stats", dependencies=[Depends(get_current_admin)])
+async def stats(
+    start: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    end: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    view: str = Query("node", pattern="^(node|app)$"),
+    name: str = Query(""),
+    db: AsyncSession = Depends(get_db),
+):
+    start_date = date.fromisoformat(start)
+    end_date = date.fromisoformat(end)
+    labels = [
+        (start_date + timedelta(days=i)).isoformat()
+        for i in range((end_date - start_date).days + 1)
+    ]
+
+    date_filter = [
+        cast(Connection.connected_at, Date) >= start_date,
+        cast(Connection.connected_at, Date) <= end_date,
+    ]
+
+    # Build name lookups & options list
+    nodes = await get_all_nodes(db)
+    node_map = {n.id: n.name or str(n.id)[:8] for n in nodes}
+
+    apps_result = await db.execute(select(Application))
+    app_list = list(apps_result.scalars().all())
+    app_map = {a.id: a.name for a in app_list}
+
+    options = sorted(node_map.values()) if view == "node" else sorted(app_map.values())
+    selected = name if name and name in options else (options[0] if options else "")
+
+    n = len(labels)
+    daily_traffic = [0] * n
+    hourly_max_traffic = [0] * n
+    total_sessions = [0] * n
+    max_concurrent = [0] * n
+
+    if selected:
+        if view == "node":
+            entity_id = next((k for k, v in node_map.items() if v == selected), None)
+            entity_filter = Connection.node_id == entity_id
+        else:
+            entity_id = next((k for k, v in app_map.items() if v == selected), None)
+            entity_filter = Connection.app_id == entity_id
+
+        if entity_id:
+            filters = date_filter + [entity_filter]
+
+            # 1) Daily total traffic
+            tq = await db.execute(
+                select(
+                    cast(Connection.connected_at, Date).label("day"),
+                    func.sum(Connection.bytes_up + Connection.bytes_down).label("total_bytes"),
+                ).where(*filters).group_by("day")
+            )
+            tmap = {r.day.isoformat(): int(r.total_bytes or 0) for r in tq.all()}
+            daily_traffic = [tmap.get(d, 0) for d in labels]
+
+            # 2) Hourly max traffic per day
+            hq = await db.execute(
+                select(
+                    cast(Connection.connected_at, Date).label("day"),
+                    extract("hour", Connection.connected_at).label("hr"),
+                    func.sum(Connection.bytes_up + Connection.bytes_down).label("total_bytes"),
+                ).where(*filters).group_by("day", "hr")
+            )
+            hourly_by_day: dict[str, list[int]] = {}
+            for r in hq.all():
+                hourly_by_day.setdefault(r.day.isoformat(), []).append(int(r.total_bytes or 0))
+            hourly_max_traffic = [max(hourly_by_day.get(d, [0])) for d in labels]
+
+            # 3) Total sessions per day
+            sq = await db.execute(
+                select(
+                    cast(Connection.connected_at, Date).label("day"),
+                    func.count().label("cnt"),
+                ).where(*filters).group_by("day")
+            )
+            smap = {r.day.isoformat(): int(r.cnt) for r in sq.all()}
+            total_sessions = [smap.get(d, 0) for d in labels]
+
+            # 4) Max concurrent per day
+            start_dt = datetime(start_date.year, start_date.month, start_date.day, tzinfo=timezone.utc)
+            end_dt = datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59, tzinfo=timezone.utc)
+            cq = await db.execute(
+                select(Connection.connected_at, Connection.disconnected_at).where(
+                    entity_filter,
+                    Connection.connected_at <= end_dt,
+                    (Connection.disconnected_at >= start_dt) | (Connection.disconnected_at.is_(None)),
+                )
+            )
+            conns = cq.all()
+            now = datetime.now(timezone.utc)
+            for i, d_str in enumerate(labels):
+                d = date.fromisoformat(d_str)
+                day_start = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+                day_end = datetime(d.year, d.month, d.day, 23, 59, 59, tzinfo=timezone.utc)
+                events = []
+                for c in conns:
+                    c_end = c.disconnected_at or now
+                    if c.connected_at <= day_end and c_end >= day_start:
+                        events.append((max(c.connected_at, day_start), 1))
+                        events.append((min(c_end, day_end), -1))
+                if events:
+                    events.sort(key=lambda x: (x[0], x[1]))
+                    cur = peak = 0
+                    for _, delta in events:
+                        cur += delta
+                        peak = max(peak, cur)
+                    max_concurrent[i] = peak
+
+    return {
+        "labels": labels,
+        "options": options,
+        "selected": selected,
+        "daily_traffic": daily_traffic,
+        "hourly_max_traffic": hourly_max_traffic,
+        "total_sessions": total_sessions,
+        "max_concurrent": max_concurrent,
     }
 
 

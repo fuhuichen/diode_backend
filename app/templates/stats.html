@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block title %}Statistics - Diode Backend{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <!-- Controls -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div class="flex items-center justify-between flex-wrap gap-4">
+            <!-- Left: View toggle + Dropdown -->
+            <div class="flex items-center gap-3">
+                <div class="flex bg-gray-100 rounded-lg p-1">
+                    <button data-view="node" class="view-btn px-4 py-1.5 text-sm font-medium rounded-md transition-colors">By Node</button>
+                    <button data-view="app" class="view-btn px-4 py-1.5 text-sm font-medium rounded-md transition-colors">By App</button>
+                </div>
+                <select id="entitySelect" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 min-w-[160px]">
+                </select>
+            </div>
+            <!-- Right: Date range -->
+            <span id="rangeLabel" class="text-sm font-medium text-gray-700 min-w-[180px] text-center"></span>
+        </div>
+        <!-- Navigation buttons -->
+        <div class="flex items-center justify-center gap-2 mt-3 pt-3 border-t border-gray-100">
+            <button data-step="-month" class="nav-btn px-3 py-1 text-xs font-medium rounded border border-gray-300 hover:bg-gray-50 transition-colors">&laquo; Month</button>
+            <button data-step="-week"  class="nav-btn px-3 py-1 text-xs font-medium rounded border border-gray-300 hover:bg-gray-50 transition-colors">&lsaquo; Week</button>
+            <button data-step="-day"   class="nav-btn px-3 py-1 text-xs font-medium rounded border border-gray-300 hover:bg-gray-50 transition-colors">&lsaquo; Day</button>
+            <button id="todayBtn"      class="nav-btn px-3 py-1 text-xs font-medium rounded bg-brand-600 text-white hover:bg-brand-700 transition-colors">Today</button>
+            <button data-step="+day"   class="nav-btn px-3 py-1 text-xs font-medium rounded border border-gray-300 hover:bg-gray-50 transition-colors">Day &rsaquo;</button>
+            <button data-step="+week"  class="nav-btn px-3 py-1 text-xs font-medium rounded border border-gray-300 hover:bg-gray-50 transition-colors">Week &rsaquo;</button>
+            <button data-step="+month" class="nav-btn px-3 py-1 text-xs font-medium rounded border border-gray-300 hover:bg-gray-50 transition-colors">Month &raquo;</button>
+        </div>
+    </div>
+
+    <!-- Traffic chart -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-800" id="trafficTitle">Daily Traffic</h2>
+            <div class="flex bg-gray-100 rounded-lg p-1">
+                <button data-tmetric="daily" class="tmetric-btn px-3 py-1 text-xs font-medium rounded-md transition-colors">Daily Total</button>
+                <button data-tmetric="hourly" class="tmetric-btn px-3 py-1 text-xs font-medium rounded-md transition-colors">Hourly Peak</button>
+            </div>
+        </div>
+        <div style="position:relative;height:350px;">
+            <canvas id="trafficChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Users chart -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-800" id="usersTitle">Users</h2>
+            <div class="flex bg-gray-100 rounded-lg p-1">
+                <button data-umetric="sessions" class="umetric-btn px-3 py-1 text-xs font-medium rounded-md transition-colors">Total Sessions</button>
+                <button data-umetric="concurrent" class="umetric-btn px-3 py-1 text-xs font-medium rounded-md transition-colors">Max Concurrent</button>
+            </div>
+        </div>
+        <div style="position:relative;height:350px;">
+            <canvas id="usersChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function() {
+    const rp = '{{ request.scope.get("root_path", "") }}';
+
+    let trafficChart, usersChart;
+    let currentView = 'node';
+    let currentName = '';
+    let trafficMetric = 'daily';
+    let usersMetric = 'sessions';
+    let cachedData = null;
+
+    let endDate = new Date();
+    let startDate = new Date();
+    startDate.setDate(endDate.getDate() - 6);
+
+    function fmt(d) { return d.toISOString().slice(0, 10); }
+
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const units = ['B','KB','MB','GB','TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+    }
+
+    function updateRangeLabel() {
+        document.getElementById('rangeLabel').textContent = fmt(startDate) + '  ~  ' + fmt(endDate);
+    }
+
+    function shiftDates(unit, dir) {
+        const d = dir === '+' ? 1 : -1;
+        if (unit === 'day') {
+            startDate.setDate(startDate.getDate() + d);
+            endDate.setDate(endDate.getDate() + d);
+        } else if (unit === 'week') {
+            startDate.setDate(startDate.getDate() + d * 7);
+            endDate.setDate(endDate.getDate() + d * 7);
+        } else {
+            startDate.setMonth(startDate.getMonth() + d);
+            endDate.setMonth(endDate.getMonth() + d);
+        }
+    }
+
+    function setActive(selector, attr, value) {
+        document.querySelectorAll(selector).forEach(btn => {
+            if (btn.dataset[attr] === value) {
+                btn.classList.add('bg-brand-600', 'text-white', 'shadow-sm');
+                btn.classList.remove('text-gray-600', 'hover:bg-gray-100');
+            } else {
+                btn.classList.remove('bg-brand-600', 'text-white', 'shadow-sm');
+                btn.classList.add('text-gray-600', 'hover:bg-gray-100');
+            }
+        });
+    }
+
+    function initCharts() {
+        trafficChart = new Chart(document.getElementById('trafficChart').getContext('2d'), {
+            type: 'line',
+            data: { labels: [], datasets: [] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + formatBytes(ctx.parsed.y) } } },
+                scales: { y: { beginAtZero: true, ticks: { callback: v => formatBytes(v) } } }
+            }
+        });
+        usersChart = new Chart(document.getElementById('usersChart').getContext('2d'), {
+            type: 'bar',
+            data: { labels: [], datasets: [] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            }
+        });
+    }
+
+    function renderCharts() {
+        if (!cachedData) return;
+        const data = cachedData;
+        const label = data.selected || '(none)';
+
+        // Traffic
+        const isHourly = trafficMetric === 'hourly';
+        const tData = isHourly ? data.hourly_max_traffic : data.daily_traffic;
+        const tLabel = isHourly ? 'Hourly Peak' : 'Daily Total';
+        document.getElementById('trafficTitle').textContent = tLabel + ' - ' + label;
+        trafficChart.data.labels = data.labels;
+        trafficChart.data.datasets = [{
+            label: tLabel,
+            data: tData,
+            borderColor: isHourly ? '#f59e0b' : '#6366f1',
+            backgroundColor: (isHourly ? '#f59e0b' : '#6366f1') + '20',
+            tension: 0.3, fill: true, pointRadius: 3
+        }];
+        trafficChart.update();
+
+        // Users
+        const isConcurrent = usersMetric === 'concurrent';
+        const uData = isConcurrent ? data.max_concurrent : data.total_sessions;
+        const uLabel = isConcurrent ? 'Max Concurrent' : 'Total Sessions';
+        document.getElementById('usersTitle').textContent = uLabel + ' - ' + label;
+        usersChart.data.labels = data.labels;
+        usersChart.data.datasets = [{
+            label: uLabel,
+            data: uData,
+            backgroundColor: isConcurrent ? '#ef444480' : '#6366f180',
+            borderColor: isConcurrent ? '#ef4444' : '#6366f1',
+            borderWidth: 1
+        }];
+        usersChart.update();
+    }
+
+    async function fetchAndRender() {
+        updateRangeLabel();
+        const token = document.cookie.split('; ').find(c => c.startsWith('admin_token='))?.split('=')[1];
+        const params = new URLSearchParams({
+            start: fmt(startDate), end: fmt(endDate),
+            view: currentView, name: currentName
+        });
+        const res = await fetch(rp + '/api/admin/stats?' + params, {
+            headers: { 'Authorization': 'Bearer ' + (token || '') }
+        });
+        if (!res.ok) return;
+        cachedData = await res.json();
+
+        // Update dropdown
+        const sel = document.getElementById('entitySelect');
+        sel.innerHTML = '';
+        cachedData.options.forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o; opt.textContent = o;
+            if (o === cachedData.selected) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        currentName = cachedData.selected;
+
+        renderCharts();
+    }
+
+    // View toggle
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentView = btn.dataset.view;
+            currentName = '';
+            setActive('.view-btn', 'view', currentView);
+            fetchAndRender();
+        });
+    });
+
+    // Dropdown
+    document.getElementById('entitySelect').addEventListener('change', e => {
+        currentName = e.target.value;
+        fetchAndRender();
+    });
+
+    // Traffic metric toggle
+    document.querySelectorAll('.tmetric-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            trafficMetric = btn.dataset.tmetric;
+            setActive('.tmetric-btn', 'tmetric', trafficMetric);
+            renderCharts();
+        });
+    });
+
+    // Users metric toggle
+    document.querySelectorAll('.umetric-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            usersMetric = btn.dataset.umetric;
+            setActive('.umetric-btn', 'umetric', usersMetric);
+            renderCharts();
+        });
+    });
+
+    // Nav buttons
+    document.querySelectorAll('.nav-btn[data-step]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const step = btn.dataset.step;
+            shiftDates(step.slice(1), step[0]);
+            fetchAndRender();
+        });
+    });
+    document.getElementById('todayBtn').addEventListener('click', () => {
+        endDate = new Date();
+        startDate = new Date();
+        startDate.setDate(endDate.getDate() - 6);
+        fetchAndRender();
+    });
+
+    initCharts();
+    setActive('.view-btn', 'view', 'node');
+    setActive('.tmetric-btn', 'tmetric', 'daily');
+    setActive('.umetric-btn', 'umetric', 'sessions');
+    fetchAndRender();
+})();
+</script>
+{% endblock %}
