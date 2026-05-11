@@ -9,7 +9,7 @@
     "instanceCount": "1",
     "bundleId": "nano_3_0",
     "blueprintId": "amazon_linux_2023",
-    "diodeVersion": "v1.17.2",
+    "diodeVersion": "v1.18.2",
     "backendUrl": "http://13.213.186.48/diode",
     "keyPairName": ""
   }

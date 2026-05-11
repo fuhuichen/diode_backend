@@ -17,14 +17,22 @@ const backendUrl = app.node.tryGetContext("backendUrl") || "https://api.diode.de
 const keyPairName = app.node.tryGetContext("keyPairName") || "";
 const provider = app.node.tryGetContext("provider") || "lightsail";
 const instanceType = app.node.tryGetContext("instanceType") || "t3a.nano";
+const stackSuffix: string = app.node.tryGetContext("stackSuffix") || "";
 
 // Parse node tokens — use placeholders during bootstrap/synth-only if not provided
 const tokens = nodeTokens
   ? nodeTokens.split(",")
   : Array.from({ length: instanceCount }, () => "placeholder");
 
+const ec2StackName = stackSuffix
+  ? `DiodeNodesEc2-${region}-${stackSuffix}`
+  : `DiodeNodesEc2-${region}`;
+const lightsailStackName = stackSuffix
+  ? `DiodeNodes-${region}-${stackSuffix}`
+  : `DiodeNodes-${region}`;
+
 if (provider === "ec2") {
-  new DiodeNodeEc2Stack(app, `DiodeNodesEc2-${region}`, {
+  new DiodeNodeEc2Stack(app, ec2StackName, {
     env: { account: process.env.CDK_DEFAULT_ACCOUNT, region },
     region,
     instanceCount,
@@ -35,7 +43,7 @@ if (provider === "ec2") {
     keyPairName: keyPairName || undefined,
   });
 } else {
-  new DiodeNodeStack(app, `DiodeNodes-${region}`, {
+  new DiodeNodeStack(app, lightsailStackName, {
     env: { region },
     region,
     instanceCount,

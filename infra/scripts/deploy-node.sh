@@ -8,7 +8,7 @@ set -euo pipefail
 #   ADMIN_USERNAME - Admin username for backend login (default: admin)
 #   ADMIN_PASSWORD - Admin password for backend login
 #   BACKEND_URL    - Backend API URL (default: https://api.diode.dev)
-#   DIODE_VERSION  - Diode client version (default: v1.17.2)
+#   DIODE_VERSION  - Diode client version (default: v1.18.2)
 #   BUNDLE_ID      - Lightsail bundle (default: nano_3_0)
 #   KEY_PAIR_NAME  - Optional key pair for SSH access
 #   PROVIDER       - "lightsail" (default) or "ec2"
@@ -22,17 +22,18 @@ COUNT="${2:-1}"
 
 BACKEND_URL="${BACKEND_URL:-http://13.213.186.48/diode}"
 ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
-DIODE_VERSION="${DIODE_VERSION:-v1.17.2}"
+DIODE_VERSION="${DIODE_VERSION:-v1.18.2}"
 BUNDLE_ID="${BUNDLE_ID:-nano_3_0}"
 KEY_PAIR_NAME="${KEY_PAIR_NAME:-}"
 PROVIDER="${PROVIDER:-lightsail}"
 INSTANCE_TYPE="${INSTANCE_TYPE:-t3a.nano}"
+STACK_SUFFIX="${STACK_SUFFIX:-}"
 
-# Derive stack name based on provider
+# Derive stack name based on provider (with optional suffix for parallel deployments)
 if [ "$PROVIDER" = "ec2" ]; then
-  STACK_NAME="DiodeNodesEc2-${REGION}"
+  STACK_NAME="DiodeNodesEc2-${REGION}${STACK_SUFFIX:+-$STACK_SUFFIX}"
 else
-  STACK_NAME="DiodeNodes-${REGION}"
+  STACK_NAME="DiodeNodes-${REGION}${STACK_SUFFIX:+-$STACK_SUFFIX}"
 fi
 
 echo "=== Diode Node Deployment ==="
@@ -68,7 +69,7 @@ echo "Creating ${COUNT} node(s) in region '${REGION}'..."
 NODE_TOKENS=""
 
 for i in $(seq 0 $((COUNT - 1))); do
-  NODE_NAME="diode-node-${REGION}-${i}"
+  NODE_NAME="diode-node-${REGION}${STACK_SUFFIX:+-$STACK_SUFFIX}-${i}"
   CREATE_RESP=$(curl -sf "${BACKEND_URL}/api/admin/nodes" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer ${JWT}" \
@@ -99,7 +100,8 @@ npx cdk deploy "$STACK_NAME" \
   -c backendUrl="${BACKEND_URL}" \
   -c keyPairName="${KEY_PAIR_NAME}" \
   -c provider="${PROVIDER}" \
-  -c instanceType="${INSTANCE_TYPE}"
+  -c instanceType="${INSTANCE_TYPE}" \
+  -c stackSuffix="${STACK_SUFFIX}"
 
 echo ""
 echo "CDK deployment complete."
